@@ -1,6 +1,12 @@
 package main
 import "github.com/advancedlogic/GoOse"
+import ("net/http"; "io";
 
+"os"
+"log"
+	"io/ioutil"
+
+)
 
 func main(){
 	println("hello World ")
@@ -10,5 +16,31 @@ func main(){
 	println("The Date", article.PublishDate)
 	println("The Title", article.Title)
 	println("The Link", article.FinalUrl)
-	println("The TOP IMAGE", article.CanonicalLink)
+	println("The TOP IMAGE", article.TopImage)
+	out, err := os.Create("downloadedImage.jpg")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer out.Close()
+
+	resp, err := http.Get("http://www.nyasatimes.com/wp-content/uploads/ndanga1.jpg")
+	data1, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ioutil.WriteFile("google_logo.png", data1,0666 )
+
+
+
+
+	defer resp.Body.Close()
+
+	n, err := io.Copy(out, resp.Body)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	println(" Output DOWN",n)
 }

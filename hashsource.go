@@ -12,40 +12,39 @@ import (
 )
 
 func main() {
-
-	fmt.Printf("Reading Feeds from the Database!")
-	getGetLinks()
-	getContent()
-	fmt.Println(time.Now())
-}
-
-
-
-func getGetLinks() {
 	cluster := gocql.NewCluster("localhost")
 	cluster.Keyspace = "hashmedia"
 	cluster.Consistency = gocql.Quorum
 	session, _ := cluster.CreateSession()
 	defer session.Close()
 
+	fmt.Printf("Reading Feeds from the Database!")
+	getGetLinks(session)
+	getContent(session)
+	updateZonePosts(session)
+	updateSitePosts(session)
+	fmt.Println(time.Now())
+}
 
-	feeds := session.Query("SELECT zone,feedLink FROM feeds").Iter()
+
+
+func getGetLinks(session *gocql.Session) {
+	feeds := session.Query("SELECT zone,feedLink,sitecode FROM feeds").Iter()
 	var feedLink string
 	var zone string
-	for feeds.Scan(&zone,&feedLink) {
+	var siteCode string
+	for feeds.Scan(&zone, &feedLink, &siteCode) {
 		feed, err := rss.Fetch(feedLink)
 		if err != nil {
 			// handle error.
 		}
 		var links = feed.Items
-		for _, item := range links {
+		for _, link := range links {
 
-			if err := session.Query(`INSERT INTO links  (zone,linkhash,datepublished,site,url) VALUES (?,?,?,?,?)`,
-				zone,GetMD5Hash(item.ID), item.Date, item.ID, item.Link).Exec(); err != nil {
+			if err := session.Query(`INSERT INTO links  (zone,linkhash,datepublished,site,url,sitecode) VALUES (?,?,?,?,?,?)`,
+				zone, GetMD5Hash(link.ID), link.Date, link.ID, link.Link,siteCode).Exec(); err != nil {
 				log.Fatal(err)
-
 			}
-
 		}
 	}
 	if err := feeds.Close(); err != nil {
@@ -53,20 +52,14 @@ func getGetLinks() {
 	}
 }
 
-func getContent() {
-	cluster := gocql.NewCluster("localhost")
-	cluster.Keyspace = "hashmedia"
-	cluster.Consistency = gocql.Quorum
-	session, _ := cluster.CreateSession()
-	defer session.Close()
-	links := session.Query("SELECT url,zone,datepublished FROM links").Iter()
-	var url string
-	var zone string
+func getContent(session *gocql.Session) {
+	links := session.Query("SELECT url,zone,datepublished,sitecode FROM links").Iter()
+	var url, zone,siteCode string
 	var datepublished time.Time
-	for links.Scan(&url, &zone, &datepublished) {
-		duration:=time.Now().Sub(datepublished).Minutes()
-		if(duration < 60){
-			LoadContent(zone,url,datepublished, session)
+	for links.Scan(&url, &zone, &datepublished, &siteCode) {
+		duration := time.Now().Sub(datepublished).Minutes()
+		if (duration < 6000) {
+			LoadContent(zone, url, datepublished, session,siteCode)
 		}
 	}
 	if err := links.Close(); err != nil {
@@ -80,20 +73,66 @@ func GetMD5Hash(text string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func LoadContent(zone string,url string, datepublished time.Time,session *gocql.Session) {
+
+func updateZonePosts(session *gocql.Session) {
+	posts := session.Query("SELECT zone,linkhash,domain,date,article,caption,imagepath,imageurl,link,metadescription,metakeywords,seo,title,sitecode FROM posts").Iter()
+	var zone, linkhash, domain, article, caption, imagepath, imageurl, link, metadescription, metakeywords, seo, title,sitecode string
+	var date time.Time
+
+	for posts.Scan(&zone, &linkhash, &domain, &date, &article, &caption, &imagepath, &imageurl, &link, &metadescription, &metakeywords, &seo, &title,&sitecode) {
+
+		if err := session.Query(`INSERT INTO zoneposts (zone,linkhash,domain,date,article,caption,imagepath,imageurl,link,metadescription,metakeywords,seo,title,sitecode)
+	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			zone, linkhash, domain, date, article, caption, imagepath, imageurl, link, metadescription, metakeywords, seo, title,sitecode).Exec();
+			err != nil {
+			log.Fatal(err)
+			println(err)
+		}
+	}
+	if err := posts.Close(); err != nil {
+		log.Fatal(err)
+	}
+
+
+
+}
+
+func updateSitePosts(session *gocql.Session) {
+	posts := session.Query("SELECT zone,linkhash,domain,date,article,caption,imagepath,imageurl,link,metadescription,metakeywords,seo,title,sitecode FROM posts").Iter()
+	var zone, linkhash, domain, article, caption, imagepath, imageurl, link, metadescription, metakeywords, seo, title,sitecode string
+	var date time.Time
+
+	for posts.Scan(&zone, &linkhash, &domain, &date, &article, &caption, &imagepath, &imageurl, &link, &metadescription, &metakeywords, &seo, &title,&sitecode) {
+
+		if err := session.Query(`INSERT INTO siteposts (zone,linkhash,domain,date,article,caption,imagepath,imageurl,link,metadescription,metakeywords,seo,title,sitecode)
+	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			zone, linkhash, domain, date, article, caption, imagepath, imageurl, link, metadescription, metakeywords, seo, title,sitecode).Exec();
+			err != nil {
+			log.Fatal(err)
+			println(err)
+		}
+	}
+	if err := posts.Close(); err != nil {
+		log.Fatal(err)
+	}
+
+
+}
+
+func LoadContent(zone string, url string, datepublished time.Time, session *gocql.Session,siteCode string) {
 	g := goose.New()
 	article := g.ExtractFromUrl(url)
 
-	if err := session.Query(`INSERT INTO posts (zone,linkhash,domain,date,article,caption,imagepath,imageurl,link,metadescription,metakeywords,seo,title)
-	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		zone,GetMD5Hash(article.FinalUrl), article.Domain, datepublished, article.CleanedText,
-		"caption","imagepath ",article.TopImage,article.CanonicalLink,article.MetaDescription, article.MetaKeywords,"SEO", article.Title).Exec();
+	if err := session.Query(`INSERT INTO posts (zone,linkhash,domain,date,article,caption,imagepath,imageurl,link,metadescription,metakeywords,seo,title,sitecode)
+	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		zone, GetMD5Hash(article.FinalUrl), article.Domain, datepublished, article.CleanedText,
+		"caption", "imagepath ", article.TopImage, article.CanonicalLink, article.MetaDescription, article.MetaKeywords, "SEO", article.Title,siteCode).Exec();
 		err != nil {
 		log.Fatal(err)
 		println(err)
 	}
 
-	if err := session.Query(`INSERT INTO rawposts (linkhash,zone,datepublished,rawhtml) VALUES (?,?,?,?)`, GetMD5Hash(article.FinalUrl),zone,datepublished, article.RawHtml).Exec();
+	if err := session.Query(`INSERT INTO rawposts (linkhash,zone,datepublished,rawhtml) VALUES (?,?,?,?)`, GetMD5Hash(article.FinalUrl), zone, datepublished, article.RawHtml).Exec();
 		err != nil {
 		log.Fatal(err)
 		println(err)
