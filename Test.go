@@ -8,7 +8,7 @@ import ("net/http"; "io";
 
 )
 
-func main(){
+func mainTe(){
 	println("hello World ")
 	g := goose.New()
 	article := g.ExtractFromUrl("http://www.nyasatimes.com/2014/08/21/pp-on-deadbed-claims-udf-malawi-opposition-fall-out/")
