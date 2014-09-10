@@ -60,7 +60,7 @@ func getContent(session *gocql.Session) {
 	var datepublished time.Time
 	for links.Scan(&url, &zone, &datepublished, &siteCode) {
 		duration := time.Now().Sub(datepublished).Minutes()
-		if (duration < 60) {
+		if (duration < 600000) {
 			LoadContent(zone, url, datepublished, session, siteCode)
 		}
 	}
@@ -127,7 +127,7 @@ func LoadContent(zone string, url string, datepublished time.Time, session *gocq
 
 	if err := session.Query(`INSERT INTO posts (zone,linkhash,domain,date,article,caption,imagepath,imageurl,link,metadescription,metakeywords,seo,title,sitecode)
 	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		zone, GetMD5Hash(article.FinalUrl), article.Domain, datepublished, article.CleanedText,
+		zone, GetMD5Hash(article.FinalUrl), article.Domain, datepublished, filterContent(article.CleanedText),
 		"caption", "imagepath ", article.TopImage, article.CanonicalLink, article.MetaDescription, article.MetaKeywords, prettyUrl(article.Title), article.Title, siteCode).Exec();
 		err != nil {
 		log.Fatal(err)
@@ -145,10 +145,32 @@ func LoadContent(zone string, url string, datepublished time.Time, session *gocq
 func prettyUrl(title string ) string {
 	//let's make pretty urls from title
 	reg, err := regexp.Compile("[^A-Za-z0-9]+")
+	regStoWords := regexp.MustCompile("to|old|the|is|do|at|be|was|were|am|I|says|say|of")
 	if err != nil {
 		log.Fatal(err)
 	}
-	prettyurl := reg.ReplaceAllString(title, "-")
+	cleanTitle:=regStoWords.ReplaceAllLiteralString(title,"")
+	prettyurl := reg.ReplaceAllString(cleanTitle, "-")
 	prettyurl = strings.ToLower(strings.Trim(prettyurl, "-"))
 	return prettyurl
 }
+
+func filterContent(input string) string{
+	wordsRegExp := regexp.MustCompile("Main News|Editor's Choice|Breaking News|More News|Contact us|Filed under|Home / Breaking News /|TweetEmail|Related Posts")
+	spaceRegExp :=regexp.MustCompile(`\t|\n`)
+	paraRegExp :=regexp.MustCompile(`\.`)
+	results:=wordsRegExp.ReplaceAllString(input, "")
+	result:=spaceRegExp.ReplaceAllString(results, "")
+	res:=paraRegExp.ReplaceAllString(result, ".\n")
+	return res
+}
+
+func metaDescription(s string,pos,length int) string{
+	runes:=[]rune(s)
+	l := pos+length
+	if l > len(runes) {
+		l = len(runes)
+	}
+	return string(runes[pos:l])
+}
+
