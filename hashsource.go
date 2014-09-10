@@ -60,7 +60,7 @@ func getContent(session *gocql.Session) {
 	var datepublished time.Time
 	for links.Scan(&url, &zone, &datepublished, &siteCode) {
 		duration := time.Now().Sub(datepublished).Minutes()
-		if (duration < 600000) {
+		if (duration < 60000000) {
 			LoadContent(zone, url, datepublished, session, siteCode)
 		}
 	}
@@ -128,7 +128,7 @@ func LoadContent(zone string, url string, datepublished time.Time, session *gocq
 	if err := session.Query(`INSERT INTO posts (zone,linkhash,domain,date,article,caption,imagepath,imageurl,link,metadescription,metakeywords,seo,title,sitecode)
 	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		zone, GetMD5Hash(article.FinalUrl), article.Domain, datepublished, filterContent(article.CleanedText),
-		"caption", "imagepath ", article.TopImage, article.CanonicalLink, article.MetaDescription, article.MetaKeywords, prettyUrl(article.Title), article.Title, siteCode).Exec();
+		"caption", "imagepath ", article.TopImage, article.CanonicalLink, metaDescription(filterContent(article.CleanedText),0,155), getKeyWords(article.Title), prettyUrl(article.Title), article.Title, siteCode).Exec();
 		err != nil {
 		log.Fatal(err)
 		println(err)
@@ -156,7 +156,7 @@ func prettyUrl(title string ) string {
 }
 
 func filterContent(input string) string{
-	wordsRegExp := regexp.MustCompile("Main News|Editor's Choice|Breaking News|More News|Contact us|Filed under|Home / Breaking News /|TweetEmail|Related Posts")
+	wordsRegExp := regexp.MustCompile("Main News|Home|Headlines|Statements|Advertise|Posted by|Editor's Choice|Breaking News|More News|Contact us|Filed under|Home / Breaking News /|TweetEmail|Related Posts")
 	spaceRegExp :=regexp.MustCompile(`\t|\n`)
 	paraRegExp :=regexp.MustCompile(`\.`)
 	results:=wordsRegExp.ReplaceAllString(input, "")
@@ -173,4 +173,14 @@ func metaDescription(s string,pos,length int) string{
 	}
 	return string(runes[pos:l])
 }
+
+func getKeyWords(title string) string{
+	regSpace := regexp.MustCompile(`\s`)
+	regStoWords := regexp.MustCompile("to|old|the|is|do|at|be|was|were|am|I|says|say|of")
+	cleanTitle:=regStoWords.ReplaceAllLiteralString(title,"")
+	shortenTitle:=metaDescription(cleanTitle,0,70)
+	keyWords := regSpace.ReplaceAllString(shortenTitle, ",")
+	return keyWords
+}
+
 

@@ -15,6 +15,7 @@ func main() {
 	title:="Former former Opposition parties for reject ECZ ‘fake’ electronic transmission of election results’"
 	println("Original Title is ",title)
 	println("New Pretty title is ",metaDescription(title, 0, 156))
+	println("The Keywords are  ",getKeyWords(title))
 
 }
 
@@ -86,4 +87,13 @@ func metaDescription(s string,pos,length int) string{
 		l = len(runes)
 	}
 	return string(runes[pos:l])
+}
+
+func getKeyWords(title string) string{
+	regSpace := regexp.MustCompile(`\s`)
+	regStoWords := regexp.MustCompile("to|old|the|is|do|at|be|was|were|am|I|says|say|of")
+	cleanTitle:=regStoWords.ReplaceAllLiteralString(title,"")
+	shortenTitle:=metaDescription(cleanTitle,0,70)
+	keyWords := regSpace.ReplaceAllString(shortenTitle, ",")
+	return keyWords
 }
