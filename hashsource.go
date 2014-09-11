@@ -44,7 +44,7 @@ func getGetLinks(session *gocql.Session) {
 		for _, link := range links {
 
 			if err := session.Query(`INSERT INTO links  (zone,linkhash,datepublished,site,url,sitecode) VALUES (?,?,?,?,?,?)`,
-				zone, GetMD5Hash(link.ID), link.Date, link.ID, link.Link, siteCode).Exec(); err != nil {
+				zone, GetMD5Hash(link.ID), link.Date, link.Link, link.ID, siteCode).Exec(); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -60,7 +60,7 @@ func getContent(session *gocql.Session) {
 	var datepublished time.Time
 	for links.Scan(&url, &zone, &datepublished, &siteCode) {
 		duration := time.Now().Sub(datepublished).Minutes()
-		if (duration < 60000000) {
+		if (duration < 60000) {
 			LoadContent(zone, url, datepublished, session, siteCode)
 		}
 	}
