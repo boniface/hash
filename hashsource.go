@@ -11,6 +11,16 @@ import (
 	"github.com/advancedlogic/GoOse"
 	"strings"
 	"regexp"
+	"github.com/garyburd/redigo/redis"
+	"bytes"
+)
+
+const (
+	ADDRESS = "127.0.0.1:6379"
+)
+
+var (
+	c, err = redis.Dial("tcp", ADDRESS)
 )
 
 func main() {
@@ -20,12 +30,12 @@ func main() {
 	session, _ := cluster.CreateSession()
 	defer session.Close()
 
-	fmt.Printf("Reading Feeds from the Database Start Time!",time.Now())
+	fmt.Println("Reading Feeds from the Database Start Time!", time.Now())
 	getGetLinks(session)
 	getContent(session)
 	updateZonePosts(session)
 	updateSitePosts(session)
-	fmt.Printf("Process Complete at ",time.Now())
+	fmt.Println("Process Complete at ", time.Now())
 }
 
 
@@ -60,12 +70,12 @@ func getContent(session *gocql.Session) {
 	var datepublished time.Time
 	for links.Scan(&url, &zone, &datepublished, &siteCode) {
 		duration := time.Now().Sub(datepublished).Minutes()
-		if (duration < 60000) {
+		if (duration < 60) {
 			LoadContent(zone, url, datepublished, session, siteCode)
 		}
 	}
 	if err := links.Close(); err != nil {
-		log.Fatal(err)
+		log.Fatal("Error in Loading Content",err)
 	}
 }
 
@@ -110,7 +120,7 @@ func updateSitePosts(session *gocql.Session) {
 	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			zone, linkhash, domain, date, article, caption, imagepath, imageurl, link, metadescription, metakeywords, seo, title, sitecode).Exec();
 			err != nil {
-			log.Fatal(err)
+			log.Fatal("The Key was Empty:",err)
 			println(err)
 		}
 	}
@@ -128,7 +138,7 @@ func LoadContent(zone string, url string, datepublished time.Time, session *gocq
 	if err := session.Query(`INSERT INTO posts (zone,linkhash,domain,date,article,caption,imagepath,imageurl,link,metadescription,metakeywords,seo,title,sitecode)
 	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		zone, GetMD5Hash(article.FinalUrl), article.Domain, datepublished, filterContent(article.CleanedText),
-		"caption", "imagepath ", article.TopImage, article.CanonicalLink, metaDescription(filterContent(article.CleanedText),0,155), getKeyWords(article.Title), prettyUrl(article.Title), article.Title, siteCode).Exec();
+		"caption", "imagepath ", article.TopImage, article.CanonicalLink, metaDescription(filterContent(article.CleanedText), 0, 200), getKeyWords(article.Title), prettyUrl(article.Title), article.Title, siteCode).Exec();
 		err != nil {
 		log.Fatal(err)
 		println(err)
@@ -141,46 +151,82 @@ func LoadContent(zone string, url string, datepublished time.Time, session *gocq
 	}
 }
 
-func prettyUrl(title string ) string {
+func prettyUrl(title string) string {
 	//let's make pretty urls from title
 	reg, err := regexp.Compile("[^A-Za-z0-9]+")
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error generating Pretty URL",err)
 	}
-	cleanTitle:=RemoveStopWords(GetTerms(title))
+	cleanTitle := RemoveStopWords(GetTerms(title))
 	prettyurl := reg.ReplaceAllString(cleanTitle, "-")
 	prettyurl = strings.ToLower(strings.Trim(prettyurl, "-"))
 	return prettyurl
 }
 
-func filterContent(input string) string{
-	wordsRegExp := regexp.MustCompile("Main News|Home|Headlines|Statements|Advertise|Posted by|Editor's Choice|Breaking News|More News|Contact us|Filed under|Home / Breaking News /|TweetEmail|Related Posts")
-	spaceRegExp :=regexp.MustCompile(`\t|\n`)
-	paraRegExp :=regexp.MustCompile(`\.`)
-	results:=wordsRegExp.ReplaceAllString(input, "")
-	result:=spaceRegExp.ReplaceAllString(results, "")
-	res:=paraRegExp.ReplaceAllString(result, ".\n")
+func filterContent(input string) string {
+	wordsRegExp := regexp.MustCompile("Main News|Home|You are here: /|Posted in|ZNBC User|Featured||About usOrg StructureHistoryRate CardsProducts & ServicesOnline SubscriptionsSelect a PageAbout us- Org Structure- History- Rate CardsProducts & Services- Online SubscriptionsAbout usOrg StructureHistoryRate CardsProducts & ServicesOnline SubscriptionsSelect a PageAbout us- Org Structure- History- Rate CardsProducts & Services- Online SubscriptionsLatest NewsStoriesCourt NewsBusinessStoriesMoney/Stock ExchangeColumnsLetters to the EditorEntertainmentMusicTheatreFilmsOthersColumnsFeaturesOpinionSportsStoriesFootballRugbyBoxingVolleyballColumnsOthersSelect a PageLatest News- Stories- Court NewsBusiness- Stories- Money/Stock Exchange- ColumnsLetters to the EditorEntertainment- Music- Theatre- Films- Others- ColumnsFeaturesOpinionSports- Stories- Football- Rugby- Boxing- Volleyball- Columns- OthersLatest NewsStoriesCourt NewsBusinessStoriesMoney/Stock ExchangeColumnsLetters to the EditorEntertainmentMusicTheatreFilmsOthersColumnsFeaturesOpinionSportsStoriesFootballRugbyBoxingVolleyballColumnsOthersSelect a PageLatest News- Stories- Court NewsBusiness- Stories- Money/Stock Exchange- ColumnsLetters to the EditorEntertainment- Music- Theatre- Films- Others- ColumnsFeaturesOpinionSports- Stories- Football- Rugby- Boxing- Volleyball- Columns- Others HOME SLIDE SHOW, SHOWCASE Register to vote!|About us|News|Headlines|Statements|Advertise|Posted by|Editor's Choice|Breaking News|More News|Contact us|Filed under|Home / Breaking News /|TweetEmail|Related Posts")
+	spaceRegExp := regexp.MustCompile(`\t|\n`)
+	paraRegExp := regexp.MustCompile(`\.`)
+	results := wordsRegExp.ReplaceAllString(input, "")
+	result := spaceRegExp.ReplaceAllString(results, "")
+	res := paraRegExp.ReplaceAllString(result, ".\n")
 	return res
 }
 
-func metaDescription(s string,pos,length int) string{
-	runes:=[]rune(s)
-	l := pos+length
+func metaDescription(s string, pos, length int) string {
+	runes := []rune(s)
+	l := pos + length
 	if l > len(runes) {
 		l = len(runes)
 	}
-	results:=string(runes[pos:l])
-	return CapitalliseFirstLetterofEveryWord(results)
+	results := string(runes[pos:l])
+	return strings.Title(results)
 }
 
-func getKeyWords(title string) string{
+func getKeyWords(title string) string {
 	regSpace := regexp.MustCompile(`\s`)
-	cleanTitle:=RemoveStopWords(GetTerms(title))
-	shortenTitle:=metaDescription(cleanTitle,0,70)
+	cleanTitle := RemoveStopWords(GetTerms(title))
+	shortenTitle := metaDescription(cleanTitle, 0, 70)
 	keyWords := regSpace.ReplaceAllString(shortenTitle, ",")
 	return keyWords
 }
 
+
+func GetTerms(sentence string) [] string {
+	terms := strings.Split(string(sentence), " ")
+	return terms;
+}
+
+func RemoveStopWords(input []string) string {
+	var buffer bytes.Buffer
+	if err != nil {
+		log.Fatal("Fatal Error Occured",err)
+	}
+	c.Send("MULTI")
+	c.Send("DEL", "inputWords")
+	c.Send("SADD", redis.Args{}.Add("inputWords").AddFlat(input)...)
+	c.Send("SDIFF", "inputWords", "stopwords")
+	reply, err := c.Do("EXEC")
+	if err != nil {
+		fmt.Println("Error Executing Commands", err)
+	}
+	values, _ := redis.Values(reply, nil)
+	fliteredWords, err := redis.Strings(values[2], nil)
+	if err != nil {
+		fmt.Println("Wrong Type Received", err)
+	}
+	if (len(fliteredWords)) > 0 {
+		for _, v := range fliteredWords {
+			buffer.WriteString(v + " ")
+		}
+	} else {
+		fmt.Println(">>Nothing found")
+		for _, v := range input {
+			buffer.WriteString(v + " ")
+		}
+	}
+	return buffer.String()
+}
 
 
