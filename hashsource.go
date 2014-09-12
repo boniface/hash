@@ -11,8 +11,6 @@ import (
 	"github.com/advancedlogic/GoOse"
 	"strings"
 	"regexp"
-	"bytes"
-	"unicode"
 )
 
 func main() {
@@ -22,12 +20,12 @@ func main() {
 	session, _ := cluster.CreateSession()
 	defer session.Close()
 
-	fmt.Printf("Reading Feeds from the Database!")
+	fmt.Printf("Reading Feeds from the Database Start Time!",time.Now())
 	getGetLinks(session)
 	getContent(session)
 	updateZonePosts(session)
 	updateSitePosts(session)
-	fmt.Println(time.Now())
+	fmt.Printf("Process Complete at ",time.Now())
 }
 
 
@@ -143,15 +141,14 @@ func LoadContent(zone string, url string, datepublished time.Time, session *gocq
 	}
 }
 
-
 func prettyUrl(title string ) string {
 	//let's make pretty urls from title
 	reg, err := regexp.Compile("[^A-Za-z0-9]+")
-	regStoWords := regexp.MustCompile("to|old|the|is|do|at|be|was|were|am|I|says|say|of")
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	cleanTitle:=regStoWords.ReplaceAllLiteralString(title,"")
+	cleanTitle:=RemoveStopWords(GetTerms(title))
 	prettyurl := reg.ReplaceAllString(cleanTitle, "-")
 	prettyurl = strings.ToLower(strings.Trim(prettyurl, "-"))
 	return prettyurl
@@ -173,32 +170,17 @@ func metaDescription(s string,pos,length int) string{
 	if l > len(runes) {
 		l = len(runes)
 	}
-	return string(runes[pos:l])
+	results:=string(runes[pos:l])
+	return CapitalliseFirstLetterofEveryWord(results)
 }
 
 func getKeyWords(title string) string{
 	regSpace := regexp.MustCompile(`\s`)
-	regStoWords := regexp.MustCompile("to|old|the|is|do|at|be|was|were|am|I|says|say|of")
-	cleanTitle:=regStoWords.ReplaceAllLiteralString(title,"")
+	cleanTitle:=RemoveStopWords(GetTerms(title))
 	shortenTitle:=metaDescription(cleanTitle,0,70)
 	keyWords := regSpace.ReplaceAllString(shortenTitle, ",")
 	return keyWords
 }
 
-func capitalliseFirstLetterofEveryWord(title string) string {
-	var buffer bytes.Buffer
-	words := strings.Fields(title)
-	for _, s := range words {
-		buffer.WriteString(Caps(s)+" ")
-	}
-	return buffer.String()
-}
-
-func Caps(str string) string {
-	for i, v := range str {
-		return string(unicode.ToUpper(v)) + str[i + 1:]
-	}
-	return ""
-}
 
 
