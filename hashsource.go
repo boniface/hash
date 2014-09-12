@@ -11,6 +11,8 @@ import (
 	"github.com/advancedlogic/GoOse"
 	"strings"
 	"regexp"
+	"bytes"
+	"unicode"
 )
 
 func main() {
@@ -181,6 +183,22 @@ func getKeyWords(title string) string{
 	shortenTitle:=metaDescription(cleanTitle,0,70)
 	keyWords := regSpace.ReplaceAllString(shortenTitle, ",")
 	return keyWords
+}
+
+func capitalliseFirstLetterofEveryWord(title string) string {
+	var buffer bytes.Buffer
+	words := strings.Fields(title)
+	for _, s := range words {
+		buffer.WriteString(Caps(s)+" ")
+	}
+	return buffer.String()
+}
+
+func Caps(str string) string {
+	for i, v := range str {
+		return string(unicode.ToUpper(v)) + str[i + 1:]
+	}
+	return ""
 }
 
 
