@@ -10,7 +10,7 @@ import (
 	"unicode"
 )
 
-func main() {
+func mainTEST() {
 	//	println(filterContent("Home / Breaking News / \t\n\nHome / Breaking News / \n\n\n\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\n\nTweetEmail\nTweetEmailPOLICE in Kabwe have arrested a blind couple for allegedly stealing K15,000 meant for the Blind Skills Farmers’ Club in Serenje.\nThe police identified the couple as Isaiah Mushota, aged 56, and his wife Doreen Mando, 44, both of Katondo Township in Kabwe.\nCentral Province Commissioner of Police Standwell Lungu said that the Blind Skills Farmers’ Club was run by the visually impaired and supported by the Ministry of Community Development and Social Welfare.\nThe two were leaders in the farmers’ club at the time they allegedly stole the money before fleeing from Serenje.\nMr Lungu said police investigations revealed that the money (K15,000) was deposited in June this year through Finance Bank in Serenje into the club’s account but it was later withdrawn by Mushota from Lusaka.\nThe couple is suspected to have taken advantage of their positions in the club, where Mushota was chairperson and his wife treasurer, to access the funds illegally.\nMr Lungu said the couple had been on the run for a while but was finally apprehend yesterday in Katondo area and would be charged with theft.\nSource: Times of Zambia\n\t\t\t\n\t\t\t\n\t\t\t\t\t\n\t\t            \n            \tRelated Posts\n\t\t\t\n"))
 	//	getArticle()
 	//	getGetLinks()
@@ -69,7 +69,7 @@ func stopWords() string {
 	return words
 }
 
-func prettyUrl(title string) string {
+func prettyUrlTES(title string) string {
 	//let's make pretty urls from title
 	reg, err := regexp.Compile("[^A-Za-z0-9]+")
 	regStoWords := regexp.MustCompile(stopWords())
@@ -82,7 +82,7 @@ func prettyUrl(title string) string {
 	return prettyurl
 }
 
-func metaDescription(s string, pos, length int) string {
+func metaDescriptionTest(s string, pos, length int) string {
 	runes := []rune(s)
 	l := pos + length
 	if l > len(runes) {
@@ -91,7 +91,7 @@ func metaDescription(s string, pos, length int) string {
 	return string(runes[pos:l])
 }
 
-func getKeyWords(title string) string {
+func getKeyWordsTest(title string) string {
 	regSpace := regexp.MustCompile(`\s`)
 	regStoWords := regexp.MustCompile("` for`|`ect`|` on `|all")
 	cleanTitle := regStoWords.ReplaceAllLiteralString(title, "")
@@ -100,7 +100,7 @@ func getKeyWords(title string) string {
 	return keyWords
 }
 
-func MakeFirstLowerCase(s string) string {
+func MakeFirstLowerCaseTest(s string) string {
 
 	if len(s) < 2 {
 		return strings.ToLower(s)
