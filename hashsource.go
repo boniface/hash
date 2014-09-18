@@ -32,9 +32,9 @@ func main() {
 
 	fmt.Println("Reading Feeds from the Database Start Time!", time.Now())
 	getGetLinks(session)
-	getContent(session)
-	updateZonePosts(session)
-	updateSitePosts(session)
+//	getContent(session)
+//	updateZonePosts(session)
+//	updateSitePosts(session)
 	fmt.Println("Process Complete at ", time.Now())
 }
 
@@ -45,10 +45,12 @@ func getGetLinks(session *gocql.Session) {
 	var feedLink string
 	var zone string
 	var siteCode string
+	defer feeds.Close()
 	for feeds.Scan(&zone, &feedLink, &siteCode) {
+
 		feed, err := rss.Fetch(feedLink)
 		if err != nil {
-			// handle error.
+			println("The Error to get the Feeds Was caught here",err)
 		}
 		var links = feed.Items
 		for _, link := range links {
@@ -60,7 +62,7 @@ func getGetLinks(session *gocql.Session) {
 		}
 	}
 	if err := feeds.Close(); err != nil {
-		log.Fatal(err)
+		log.Fatal("The Feeds Read Through Error",err)
 	}
 }
 
